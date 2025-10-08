@@ -29,5 +29,8 @@ python3 app.py --csv eu_rail_network.csv --from "Paris" --to "Berlin" --sort dur
 
 python3 app.py --csv eu_rail_network.csv --from "Paris" --to "Berlin" --match contains --max-stops 2 --format table
 
-
+STUDENTS : YAHYA MOUNADI : 40234117
+YANIS DJERIDI : 40227313
+KHALED DAOUD : 40231852
 ```
+
