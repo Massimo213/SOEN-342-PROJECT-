@@ -1,4 +1,4 @@
-# Rail Network Search — Iteration 1
+# Rail Network Search : Iteration 1
 
 Implements the SOEN 342 Iteration 1 requirements.
 here I implemeted the build of a small software system ,
