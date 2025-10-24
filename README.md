@@ -28,14 +28,14 @@ Production-grade rail booking system implementing SOEN 342 requirements.
 
 ## Features
 
-### ✅ Iteration 1 (Completed)
+###  Iteration 1 (
 - Load routes from CSV
 - Search direct, 1-stop, 2-stop connections
 - Filter by city, train type, days of operation
 - Sort by duration or price
 - CLI and programmatic API
 
-### ✅ Iteration 2 (Completed)
+###  Iteration 2 
 - **Trip booking** for single or multiple travelers
 - **Unique IDs**: Alphanumeric trip IDs, numeric ticket IDs
 - **Business rules**:
@@ -196,14 +196,14 @@ Where:
 ## Testing
 
 ### Coverage
-- ✅ ID generation uniqueness
-- ✅ Client identity/deduplication
-- ✅ Family booking (Scenario 1)
-- ✅ Solo traveler (Scenario 2)
-- ✅ Duplicate booking prevention
-- ✅ Duplicate traveler prevention
-- ✅ Multi-trip viewing
-- ✅ Validation errors
+-  ID generation uniqueness
+-  Client identity/deduplication
+- Family booking (Scenario 1)
+- Solo traveler (Scenario 2)
+- Duplicate booking prevention
+- Duplicate traveler prevention
+ - Multi-trip viewing
+-  Validation errors
 
 ### Run All Tests
 ```bash
@@ -274,3 +274,8 @@ Before deploying to production:
 ## License
 
 Academic project for SOEN 342
+Yahya Mounadi -40234117
+Khlaled Daoud -  40231852
+Yanis Djerdi - 40237313
+
+
