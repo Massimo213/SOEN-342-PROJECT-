@@ -48,6 +48,8 @@ Production-grade rail booking system implementing SOEN 342 requirements.
 
 ## Quick Start
 
+> Note: The booking flow requires selecting a valid connection from the search results before entering passenger information. Invalid input will return no booking confirmation.
+
 ### Installation
 ```bash
 # No external dependencies required (pure Python 3.8+)
