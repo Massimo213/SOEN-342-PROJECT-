@@ -1,0 +1,100 @@
+@startuml
+!theme plain
+title Rail Network Booking System - Use Case Diagram
+left to right direction
+
+' Actors
+actor "Client" as client
+actor "System\nAdministrator" as admin
+actor "Database" as db <<System>>
+
+' System boundary
+rectangle "Rail Network Booking System" {
+    usecase "UC-001\nLoad Route Records" as UC001
+    usecase "UC-002\nSearch for\nConnections" as UC002
+    usecase "UC-003\nBook a Trip" as UC003
+    usecase "UC-004\nView Trips" as UC004
+    
+    ' Sub-use cases
+    usecase "Search Direct\nRoutes" as UC002a
+    usecase "Search Multi-Stop\nConnections" as UC002b
+    usecase "Validate Layover\nPolicy" as UC002c <<Iteration 3>>
+    
+    usecase "Book Single\nTraveler" as UC003a
+    usecase "Book Multiple\nTravelers" as UC003b
+    usecase "Generate Trip ID" as UC003c
+    usecase "Generate Ticket ID" as UC003d
+    
+    usecase "View Current\nTrips" as UC004a
+    usecase "View Past\nTrips" as UC004b
+}
+
+' Primary relationships
+admin --> UC001
+client --> UC002
+client --> UC003
+client --> UC004
+
+' Include relationships (mandatory sub-steps)
+UC002 .> UC002a : <<include>>
+UC002 .> UC002b : <<include>>
+UC002 ..> UC002c : <<include>>
+
+UC003 .> UC003c : <<include>>
+UC003 .> UC003d : <<include>>
+
+UC004 .> UC004a : <<include>>
+UC004 .> UC004b : <<include>>
+
+' Extend relationships (optional variations)
+UC003a ..> UC003 : <<extend>>
+UC003b ..> UC003 : <<extend>>
+
+' Dependencies between use cases
+UC002 ..> UC001 : <<depends on>>
+UC003 ..> UC002 : <<depends on>>
+UC004 ..> UC003 : <<depends on>>
+
+' System actor relationships
+UC001 --> db : persists to
+UC003 --> db : persists to
+UC004 --> db : retrieves from
+
+' Notes
+note right of UC002c
+    **NEW in Iteration 3**
+    Enforces time-based
+    layover policies:
+    - Day: 15-120 min
+    - Night: 15-30 min
+end note
+
+note right of UC003c
+    **CHANGED in Iteration 3**
+    Trip IDs now numeric
+    (was alphanumeric)
+    via DB auto-increment
+end note
+
+note bottom of UC001
+    Frequency: Once at startup
+    or on-demand update
+end note
+
+note bottom of UC002
+    Frequency: Hundreds
+    of searches daily
+end note
+
+note bottom of UC003
+    Frequency: Daily per
+    active client
+end note
+
+note bottom of UC004
+    Frequency: Weekly per
+    active client
+end note
+
+@enduml
+

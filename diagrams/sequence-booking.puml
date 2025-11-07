@@ -1,0 +1,122 @@
+@startuml
+!theme plain
+title Sequence Diagram: Book a Trip (UC-003)
+autonumber
+
+actor Client
+participant "BookingCLI" as CLI
+participant "BookingSystem" as BS
+participant "Database" as DB
+database "SQLite" as SQL
+
+== Initiate Booking ==
+Client -> CLI: book_trip(connection)
+activate CLI
+
+CLI -> Client: "How many travelers?"
+Client -> CLI: 2
+
+loop for each traveler
+    CLI -> Client: "Enter first name:"
+    Client -> CLI: "John"
+    CLI -> Client: "Enter last name:"
+    Client -> CLI: "Smith"
+    CLI -> Client: "Enter ID number:"
+    Client -> CLI: "PASS001"
+    CLI -> Client: "Enter age:"
+    Client -> CLI: 45
+end
+
+== Validation ==
+CLI -> BS: book_trip(connection, [(John, Smith, PASS001, 45), (Jane, Smith, PASS002, 42)])
+activate BS
+
+BS -> BS: validate_traveler_data()
+note right
+    - Names not empty
+    - Ages >= 0
+    - No duplicates in booking
+end note
+
+loop for each traveler
+    BS -> BS: _has_booking_for_connection(client, connection)
+    note right
+        Check if client already has
+        reservation for this connection
+    end note
+    
+    BS -> DB: get_trips_for_client(last_name, id_number)
+    activate DB
+    DB -> SQL: SELECT trips WHERE client matches
+    SQL --> DB: existing_trips[]
+    DB --> BS: existing_trips[]
+    deactivate DB
+    
+    alt Duplicate found
+        BS --> CLI: ValueError("Duplicate booking")
+        CLI --> Client: "Client already has reservation for this connection"
+        deactivate BS
+        deactivate CLI
+        |||
+        [end]
+    end
+end
+
+== Database Transaction ==
+BS -> DB: begin_transaction()
+activate DB
+
+BS -> DB: insert_trip(connection_details, timestamp)
+DB -> SQL: INSERT INTO trips (booking_timestamp, dep_city, ...) VALUES (...)
+SQL --> DB: trip_id = 12345
+note right
+    **Iteration 3 Change:**
+    trip_id is now INTEGER
+    auto-increment (not alphanumeric)
+end note
+DB --> BS: trip_id = 12345
+
+loop for each traveler
+    BS -> DB: get_or_create_client(first, last, id, age)
+    DB -> SQL: INSERT OR IGNORE INTO clients ... ON CONFLICT ... RETURNING client_id
+    SQL --> DB: client_id
+    DB --> BS: client_id
+    
+    BS -> DB: insert_ticket(client_id, trip_id, timestamp)
+    DB -> SQL: INSERT INTO tickets (client_id, trip_id, ...) VALUES (...)
+    SQL --> DB: ticket_id = 1001
+    DB --> BS: ticket_id = 1001
+    
+    BS -> BS: create Reservation(client, ticket)
+end
+
+loop for each leg in connection
+    BS -> DB: insert_trip_leg(trip_id, route_id, leg_order)
+    DB -> SQL: INSERT INTO trip_legs (trip_id, route_id, leg_order) VALUES (...)
+    SQL --> DB: success
+    DB --> BS: success
+end
+
+BS -> DB: commit_transaction()
+DB -> SQL: COMMIT
+SQL --> DB: success
+DB --> BS: success
+deactivate DB
+
+== Confirmation ==
+BS -> BS: create Trip object
+BS --> CLI: Trip(trip_id=12345, reservations=[...])
+deactivate BS
+
+CLI -> Client: Display confirmation
+note right
+    "Booking successful!"
+    "Trip ID: 12345"
+    "Travelers: 2"
+    "Total cost: 178.00 EUR"
+    "Tickets: 1001, 1002"
+end note
+deactivate CLI
+
+@enduml
+

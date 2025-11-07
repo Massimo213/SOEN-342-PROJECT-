@@ -1,0 +1,188 @@
+@startuml
+!theme plain
+title Rail Network Booking System - Domain Model (Class Diagram)
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+package "rail_network" {
+    class RailNetwork {
+        - routes: List<TrainRoute>
+        - index_by_origin: Dict<str, List<TrainRoute>>
+        __
+        + from_csv(path: str): RailNetwork
+        + search(departure_city, arrival_city, ...) : List<Itinerary>
+        - _build_one_stop(...): List<Itinerary>
+        - _build_two_stops(...): List<Itinerary>
+        - _transfer_gap_ok(r_prev, r_next, min_minutes): bool
+        - _match(route, criteria): bool
+    }
+
+    class TrainRoute {
+        + route_id: str
+        + departure_city: str
+        + arrival_city: str
+        + departure_time: str
+        + arrival_time: str
+        + train_type: str
+        + days_of_operation: str
+        + first_class_rate: float
+        + second_class_rate: float
+        __
+        + dep_min: int {computed}
+        + arr_min: int {computed}
+        + duration_min: int {computed}
+    }
+
+    class Itinerary {
+        + legs: List<Leg>
+        __
+        + origin: str {property}
+        + destination: str {property}
+        + departure_time: str {property}
+        + arrival_time: str {property}
+        + total_travel_minutes: int {property}
+        + displayed_transfer_minutes: int {property}
+        + price(travel_class: str): float
+        + to_row(travel_class: str): dict
+    }
+
+    class Leg {
+        + route: TrainRoute
+    }
+
+    RailNetwork "1" *-- "many" TrainRoute : manages
+    RailNetwork ..> Itinerary : creates
+    Itinerary "1" *-- "1..3" Leg : composed of
+    Leg "1" --> "1" TrainRoute : references
+}
+
+package "booking_system" {
+    class BookingSystem {
+        - db: Database
+        __
+        + book_trip(connection, travelers): int
+        + get_trips_by_client(last_name, id): Tuple<List, List>
+        + get_trip_by_id(trip_id: int): Optional<Trip>
+        + get_all_trips(): List<Trip>
+        - _has_booking_for_connection(client, connection): bool
+        - _connections_equal(conn1, conn2): bool
+    }
+
+    class Trip <<Aggregate Root>> {
+        + trip_id: int
+        + connection: Itinerary
+        + reservations: List<Reservation>
+        + booking_timestamp: datetime
+        __
+        + total_travelers(): int
+        + get_clients(): List<Client>
+        + departure_date(): str
+        + is_past(reference_date): bool
+    }
+
+    class Reservation {
+        + client: Client
+        + ticket: Ticket
+    }
+
+    class Ticket <<Immutable>> {
+        + ticket_id: int
+        + client: Client
+        + connection: Itinerary
+        + issue_timestamp: datetime
+        __
+        + connection_date(): str
+    }
+
+    class Client <<Value Object, Immutable>> {
+        + first_name: str
+        + last_name: str
+        + id_number: str
+        + age: int
+        __
+        + __hash__(): int
+        + __eq__(other): bool
+    }
+
+    BookingSystem "1" --> "many" Trip : manages
+    BookingSystem ..> Client : registers
+    Trip "1" *-- "1..N" Reservation : contains
+    Reservation "1" --> "1" Client : for
+    Reservation "1" --> "1" Ticket : has
+    Ticket "1" --> "1" Client : issued to
+    Ticket "1" --> "1" Itinerary : for connection
+    Trip "1" --> "1" Itinerary : for connection
+}
+
+package "database" {
+    class Database {
+        - db_path: str
+        __
+        + connection(): ContextManager<Connection>
+        - _init_schema(): void
+        + load_routes_from_csv(path: str): int
+        + insert_client(client: Client): int
+        + get_client_by_credentials(last_name, id): Optional<int>
+        + insert_trip(trip_data): int
+        + insert_ticket(ticket_data): int
+        + insert_trip_leg(trip_id, route_id, order): void
+        + get_trips_for_client(client_id): List<dict>
+        + get_trip_by_id(trip_id): Optional<dict>
+    }
+
+    note right of Database
+        Persistence layer
+        All SQL operations
+        Transaction management
+        Schema versioning
+    end note
+}
+
+package "layover_validator" {
+    class LayoverValidator <<Service>> {
+        + is_layover_acceptable(arr_min, dep_min, policy): Tuple<bool, str>
+        - _is_daytime(minutes: int): bool
+    }
+
+    note right of LayoverValidator
+        **Policy:**
+        Day (06:00-22:00): 15-120 min
+        Night (22:00-06:00): 15-30 min
+    end note
+}
+
+' Relationships to infrastructure
+BookingSystem "1" --> "1" Database : uses
+RailNetwork "1" ..> "1" LayoverValidator : validates transfers
+RailNetwork "1" ..> "1" Database : loads routes from
+
+' Notes
+note top of Client
+    Identity based on
+    (last_name, id_number)
+    Frozen dataclass
+end note
+
+note top of Ticket
+    Immutable for audit trail
+    Never updated after creation
+end note
+
+note top of Trip
+    **Iteration 3 Change:**
+    trip_id: str → int
+    (DB autoincrement)
+end note
+
+legend right
+    |= Symbol |= Meaning |
+    | <<Immutable>> | Frozen dataclass |
+    | <<Value Object>> | Identity by value |
+    | <<Aggregate Root>> | DDD pattern |
+    | <<Service>> | Stateless utility |
+    | {property} | Computed attribute |
+    | {computed} | Derived field |
+endlegend
+
+@enduml
+

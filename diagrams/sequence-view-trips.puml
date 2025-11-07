@@ -1,0 +1,129 @@
+@startuml
+!theme plain
+title Sequence Diagram: View Trips (UC-004)
+autonumber
+
+actor Client
+participant "BookingCLI" as CLI
+participant "BookingSystem" as BS
+participant "Database" as DB
+database "SQLite" as SQL
+
+== Initiate Request ==
+Client -> CLI: view_trips()
+activate CLI
+
+CLI -> Client: "Enter last name:"
+Client -> CLI: "Smith"
+
+CLI -> Client: "Enter ID number:"
+Client -> CLI: "PASS001"
+
+== Lookup Client ==
+CLI -> BS: get_trips_by_client(last_name="Smith", id_number="PASS001")
+activate BS
+
+BS -> BS: normalize_input()
+note right
+    - last_name to lowercase
+    - trim whitespace from id_number
+end note
+
+BS -> DB: get_client_by_credentials(last_name="smith", id_number="PASS001")
+activate DB
+DB -> SQL: SELECT client_id FROM clients WHERE LOWER(last_name) = ? AND id_number = ?
+SQL --> DB: client_id = 1
+DB --> BS: client_id = 1
+deactivate DB
+
+alt client not found
+    BS --> CLI: ([], [])
+    CLI --> Client: "No trips found for Smith (ID: PASS001)"
+    deactivate BS
+    deactivate CLI
+    |||
+    [end]
+end
+
+== Retrieve All Trips ==
+BS -> DB: get_trips_for_client(client_id=1)
+activate DB
+
+DB -> SQL: SELECT t.* FROM trips t JOIN tickets tk ON t.trip_id = tk.trip_id WHERE tk.client_id = ?
+SQL --> DB: trips_data[]
+note right
+    Returns:
+    - trip_id: 12345
+    - booking_timestamp: "2025-11-07 14:30:00"
+    - departure_city: "Paris"
+    - arrival_city: "Berlin"
+    - departure_time: "08:30"
+    - arrival_time: "16:45"
+end note
+
+loop for each trip
+    DB -> SQL: SELECT r.* FROM routes r JOIN trip_legs tl ON r.route_id = tl.route_id WHERE tl.trip_id = ? ORDER BY tl.leg_order
+    SQL --> DB: routes_for_trip[]
+    
+    DB -> SQL: SELECT c.* FROM clients c JOIN tickets tk ON c.client_id = tk.client_id WHERE tk.trip_id = ?
+    SQL --> DB: travelers[]
+    
+    DB -> DB: reconstruct_itinerary(routes_for_trip)
+    DB -> DB: attach_travelers(travelers)
+end
+
+DB --> BS: List<dict>[trip_data_1, trip_data_2, ...]
+deactivate DB
+
+== Categorize by Date ==
+BS -> BS: today = date.today()
+
+loop for each trip
+    BS -> BS: parse departure_date from trip
+    
+    alt departure_date >= today
+        BS -> BS: add to current_trips[]
+    else departure_date < today
+        BS -> BS: add to past_trips[]
+    end
+end
+
+BS -> BS: sort current_trips by booking_timestamp DESC
+BS -> BS: sort past_trips by booking_timestamp DESC
+
+BS --> CLI: (current_trips[], past_trips[])
+deactivate BS
+
+== Display Results ==
+CLI -> CLI: format_trips(current_trips, past_trips)
+
+CLI --> Client: Display current trips
+note right
+    === CURRENT TRIPS ===
+    
+    Trip ID: 12345
+    Route: Paris → Berlin
+    Departure: 2025-11-08 08:30
+    Arrival: 2025-11-08 16:45
+    Travelers: 1 (John Smith)
+    Booked: 2025-11-07 14:30:00
+    Tickets: 1001
+end note
+
+CLI --> Client: Display past trips
+note right
+    === PAST TRIPS ===
+    
+    Trip ID: 12340
+    Route: London → Rome
+    Departure: 2025-10-15 09:00
+    Arrival: 2025-10-15 19:30
+    Travelers: 2 (John Smith, Jane Smith)
+    Booked: 2025-10-10 16:22:00
+    Tickets: 995, 996
+end note
+
+deactivate CLI
+
+@enduml
+

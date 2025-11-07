@@ -1,0 +1,131 @@
+@startuml
+!theme plain
+title Sequence Diagram: Search for Connections (UC-002)
+autonumber
+
+actor Client
+participant "CLI/API" as CLI
+participant "RailNetwork" as RN
+participant "LayoverValidator" as LV <<Iteration 3>>
+database "Database" as DB
+
+== Initialize Search ==
+Client -> CLI: search(from="Paris", to="Berlin", max_stops=2)
+activate CLI
+
+CLI -> RN: search(departure_city="Paris", arrival_city="Berlin", max_stops=2, min_transfer=15)
+activate RN
+
+RN -> DB: load routes if not cached
+activate DB
+DB --> RN: routes[]
+deactivate DB
+
+== Search Direct Routes ==
+RN -> RN: filter_direct_routes(criteria)
+note right
+    Match by:
+    - departure_city
+    - arrival_city
+    - train_type (optional)
+    - days_of_operation (optional)
+end note
+
+RN -> RN: create Itinerary for each match
+RN -> RN: add to results[]
+
+== Search 1-Stop Connections ==
+alt max_stops >= 1
+    loop for each route R1 from Paris
+        loop for each route R2 from R1.arrival_city
+            RN -> RN: _transfer_gap_ok(R1, R2, min_transfer=15)
+            
+            alt transfer time valid
+                RN -> LV: is_layover_acceptable(R1.arr_min, R2.dep_min, policy="strict")
+                activate LV
+                
+                LV -> LV: calculate gap = dep_min - arr_min
+                LV -> LV: determine time_of_day
+                
+                alt Daytime (06:00-22:00)
+                    LV -> LV: check 15 <= gap <= 120
+                else After hours (22:00-06:00)
+                    LV -> LV: check 15 <= gap <= 30
+                end
+                
+                LV --> RN: (is_valid, reason)
+                deactivate LV
+                
+                alt layover acceptable
+                    RN -> RN: create Itinerary([R1, R2])
+                    RN -> RN: add to results[]
+                else layover rejected
+                    RN -> RN: log("Rejected: {reason}")
+                    note right
+                        Example rejections:
+                        - "Layover too long: 180 min"
+                        - "After-hours layover: 45 min"
+                    end note
+                end
+            end
+        end
+    end
+end
+
+== Search 2-Stop Connections ==
+alt max_stops >= 2
+    loop for each route R1 from Paris
+        loop for each route R2 from R1.arrival_city
+            alt transfer 1 valid
+                loop for each route R3 from R2.arrival_city to Berlin
+                    RN -> RN: _transfer_gap_ok(R2, R3, min_transfer=15)
+                    
+                    alt transfer 2 valid
+                        RN -> LV: is_layover_acceptable(R2.arr_min, R3.dep_min, policy="strict")
+                        activate LV
+                        LV --> RN: (is_valid, reason)
+                        deactivate LV
+                        
+                        alt both layovers acceptable
+                            RN -> RN: create Itinerary([R1, R2, R3])
+                            RN -> RN: add to results[]
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+== Post-Processing ==
+RN -> RN: deduplicate(results)
+note right
+    Remove connections with
+    identical route sequences
+end note
+
+RN -> RN: calculate_prices(results, travel_class="second")
+
+alt sort_by == "price"
+    RN -> RN: sort by price ascending
+else sort_by == "duration"
+    RN -> RN: sort by total_travel_minutes ascending
+end
+
+RN --> CLI: List<Itinerary>[...]
+deactivate RN
+
+== Display Results ==
+CLI -> CLI: format_results(itineraries)
+CLI --> Client: Display table
+note right
+    Origin | Destination | Depart | Arrive | Stops | Duration | Price
+    Paris  | Berlin      | 08:30  | 16:45  | 0     | 495 min  | 89 EUR
+    Paris  | Berlin      | 09:00  | 18:20  | 1     | 560 min  | 124 EUR
+end note
+
+Client -> CLI: select connection #1
+deactivate CLI
+
+@enduml
+

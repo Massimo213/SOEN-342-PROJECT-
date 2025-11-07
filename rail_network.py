@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Iterable
 from datetime import datetime, timedelta
 import re
+from layover_validator import LayoverValidator
 
 # ----------------------------
 # Time helpers
@@ -214,6 +215,7 @@ class RailNetwork:
         min_transfer_minutes: int = 15,
         travel_class: str = "second",
         sort_by: str = "duration",
+        layover_policy: str = "strict",
     ) -> List[Itinerary]:
         results: List[Itinerary] = []
 
@@ -223,9 +225,9 @@ class RailNetwork:
             results.append(Itinerary(legs=[Leg(r)]))
 
         if max_stops >= 1 and departure_city and arrival_city:
-            results.extend(self._build_one_stop(departure_city, arrival_city, train_type, day_contains, min_transfer_minutes))
+            results.extend(self._build_one_stop(departure_city, arrival_city, train_type, day_contains, min_transfer_minutes, layover_policy))
         if max_stops >= 2 and departure_city and arrival_city:
-            results.extend(self._build_two_stops(departure_city, arrival_city, train_type, day_contains, min_transfer_minutes))
+            results.extend(self._build_two_stops(departure_city, arrival_city, train_type, day_contains, min_transfer_minutes, layover_policy))
 
         def legs_key(it: Itinerary):
             return tuple((leg.route.route_id for leg in it.legs))
@@ -255,7 +257,7 @@ class RailNetwork:
             return False
         return True
 
-    def _build_one_stop(self, dep_city, arr_city, train_type, day_contains, min_transfer_minutes) -> List[Itinerary]:
+    def _build_one_stop(self, dep_city, arr_city, train_type, day_contains, min_transfer_minutes, layover_policy="strict") -> List[Itinerary]:
         its: List[Itinerary] = []
         dep_routes = [r for r in self.routes if self._match(r, dep_city, None, train_type, day_contains)]
         for r1 in dep_routes:
@@ -263,11 +265,11 @@ class RailNetwork:
             for r2 in self.index_by_origin.get(mid.lower(), []):
                 if not self._match(r2, mid, arr_city, train_type, day_contains):
                     continue
-                if self._transfer_gap_ok(r1, r2, min_transfer_minutes):
+                if self._transfer_gap_ok(r1, r2, min_transfer_minutes, layover_policy):
                     its.append(Itinerary(legs=[Leg(r1), Leg(r2)]))
         return its
 
-    def _build_two_stops(self, dep_city, arr_city, train_type, day_contains, min_transfer_minutes) -> List[Itinerary]:
+    def _build_two_stops(self, dep_city, arr_city, train_type, day_contains, min_transfer_minutes, layover_policy="strict") -> List[Itinerary]:
         its: List[Itinerary] = []
         dep_routes = [r for r in self.routes if self._match(r, dep_city, None, train_type, day_contains)]
         for r1 in dep_routes:
@@ -275,18 +277,35 @@ class RailNetwork:
             for r2 in self.index_by_origin.get(mid1.lower(), []):
                 if not self._match(r2, mid1, None, train_type, day_contains):
                     continue
-                if not self._transfer_gap_ok(r1, r2, min_transfer_minutes):
+                if not self._transfer_gap_ok(r1, r2, min_transfer_minutes, layover_policy):
                     continue
                 mid2 = r2.arrival_city
                 for r3 in self.index_by_origin.get(mid2.lower(), []):
                     if not self._match(r3, mid2, arr_city, train_type, day_contains):
                         continue
-                    if self._transfer_gap_ok(r2, r3, min_transfer_minutes):
+                    if self._transfer_gap_ok(r2, r3, min_transfer_minutes, layover_policy):
                         its.append(Itinerary(legs=[Leg(r1), Leg(r2), Leg(r3)]))
         return its
 
-    def _transfer_gap_ok(self, r_prev, r_next, min_transfer_minutes) -> bool:
+    def _transfer_gap_ok(self, r_prev, r_next, min_transfer_minutes, layover_policy: str = "strict") -> bool:
+        """
+        Check if transfer between two routes is feasible.
+        
+        Iteration 3: Now includes layover validation based on time of day.
+        """
         gap = r_next.dep_min - r_prev.arr_min
         if gap < 0:
             gap += 24*60
-        return gap >= min_transfer_minutes
+        
+        # Basic minimum transfer time check
+        if gap < min_transfer_minutes:
+            return False
+        
+        # Iteration 3: Apply layover policy validation
+        is_valid, reason = LayoverValidator.is_layover_acceptable(
+            r_prev.arr_min,
+            r_next.dep_min,
+            policy=layover_policy
+        )
+        
+        return is_valid
