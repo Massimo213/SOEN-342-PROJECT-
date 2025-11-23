@@ -1,0 +1,169 @@
+@startuml
+!theme plain
+title State Machine: Book a Trip (Use Case UC-003)
+scale 1.2
+
+[*] --> Idle
+
+state Idle {
+    Idle : Entry: System ready
+    Idle : No active booking
+}
+
+Idle --> SearchingConnection : client initiates booking\n/ request connection
+
+state SearchingConnection {
+    SearchingConnection : Entry: Display search form
+    SearchingConnection : Do: Validate search criteria
+}
+
+SearchingConnection --> DisplayingResults : valid criteria\n/ execute search
+SearchingConnection --> SearchingConnection : invalid criteria\n/ show error, retry
+SearchingConnection --> Idle : cancel
+
+state DisplayingResults {
+    DisplayingResults : Entry: Display connections
+    DisplayingResults : Do: Show direct and multi-stop options
+    DisplayingResults : Show prices and durations
+}
+
+DisplayingResults --> SearchingConnection : refine search
+DisplayingResults --> SelectingConnection : client selects connection
+DisplayingResults --> Idle : cancel
+
+state SelectingConnection {
+    SelectingConnection : Entry: Connection selected
+    SelectingConnection : Do: Display connection summary
+}
+
+SelectingConnection --> EnteringTravelers : confirm selection
+SelectingConnection --> DisplayingResults : change selection
+SelectingConnection --> Idle : cancel
+
+state EnteringTravelers {
+    EnteringTravelers : Entry: Prompt for traveler count
+    EnteringTravelers : Do: Collect traveler details
+    EnteringTravelers : For each: first name, last name, ID, age
+}
+
+EnteringTravelers --> ValidatingTravelers : all travelers entered
+EnteringTravelers --> SelectingConnection : back to connection
+EnteringTravelers --> Idle : cancel
+
+state ValidatingTravelers {
+    ValidatingTravelers : Entry: Start validation
+    ValidatingTravelers : Do: Check business rules
+    
+    state ValidatingTravelers {
+        [*] --> CheckingFormat
+        
+        CheckingFormat : Validate names not empty
+        CheckingFormat : Validate age >= 0
+        CheckingFormat : Validate ID number exists
+        
+        CheckingFormat --> CheckingDuplicates : format valid
+        CheckingFormat --> [*] : format invalid
+        
+        CheckingDuplicates : Check no duplicate travelers\nin this booking
+        
+        CheckingDuplicates --> CheckingExisting : no duplicates
+        CheckingDuplicates --> [*] : duplicates found
+        
+        CheckingExisting : Query database for\nexisting reservations
+        CheckingExisting : Check each traveler
+        
+        CheckingExisting --> ValidationSuccess : all checks passed
+        CheckingExisting --> [*] : existing booking found
+        
+        ValidationSuccess
+    }
+}
+
+ValidatingTravelers --> CreatingReservation : [validation success]
+ValidatingTravelers --> EnteringTravelers : [validation failed]\n/ show error, allow correction
+
+state CreatingReservation {
+    CreatingReservation : Entry: Begin database transaction
+    CreatingReservation : Do: Create trip, tickets, reservations
+    
+    state CreatingReservation {
+        [*] --> GeneratingTripId
+        
+        GeneratingTripId : DB: INSERT INTO trips
+        GeneratingTripId : Get auto-increment ID
+        
+        GeneratingTripId --> InsertingLegs : trip_id received
+        
+        InsertingLegs : For each leg in connection
+        InsertingLegs : DB: INSERT INTO trip_legs
+        
+        InsertingLegs --> CreatingClients : all legs inserted
+        
+        CreatingClients : For each traveler
+        CreatingClients : DB: INSERT OR GET client
+        
+        CreatingClients --> GeneratingTickets : all clients ready
+        
+        GeneratingTickets : For each traveler
+        GeneratingTickets : DB: INSERT INTO tickets
+        GeneratingTickets : Get auto-increment ticket_id
+        
+        GeneratingTickets --> CommittingTransaction : all tickets generated
+        
+        CommittingTransaction : DB: COMMIT
+        
+        CommittingTransaction --> ReservationSuccess : [commit success]
+        CommittingTransaction --> ReservationFailed : [commit failed]
+        
+        ReservationSuccess
+        ReservationFailed
+    }
+}
+
+CreatingReservation --> DisplayingConfirmation : [reservation success]
+CreatingReservation --> HandlingError : [reservation failed]\n/ rollback transaction
+
+state DisplayingConfirmation {
+    DisplayingConfirmation : Entry: Show success message
+    DisplayingConfirmation : Do: Display trip ID
+    DisplayingConfirmation : Display ticket IDs
+    DisplayingConfirmation : Display total cost
+    DisplayingConfirmation : Display traveler count
+}
+
+DisplayingConfirmation --> Idle : acknowledged
+
+state HandlingError {
+    HandlingError : Entry: Show error message
+    HandlingError : Do: Log error
+    HandlingError : Offer retry option
+}
+
+HandlingError --> EnteringTravelers : retry
+HandlingError --> Idle : give up
+
+note right of ValidatingTravelers
+  **OCL Pre-conditions:**
+  - travelers->notEmpty()
+  - No duplicate travelers
+  - No existing bookings
+  - All ages >= 0
+end note
+
+note right of CreatingReservation
+  **OCL Post-conditions:**
+  - trip_id > 0
+  - Reservations created
+  - Unique ticket IDs
+  - Database consistent
+end note
+
+note bottom of Idle
+  **State Transitions:**
+  Total: 15 states
+  Critical path: 8 transitions
+  Rollback paths: 3
+end note
+
+@enduml
+

@@ -1,6 +1,8 @@
-# Rail Network Booking System — Iteration 3
+# Rail Network Booking System — FINAL VERSION
 
-**Complete software engineering deliverable** with database persistence, layover validation, and comprehensive documentation.
+**Complete software engineering deliverable** with formal specifications, state machine, database persistence, and comprehensive documentation.
+
+**Status:** REPOSITORY LOCKED - Final Iteration Complete
 
 ---
 
@@ -71,7 +73,7 @@
 - **History management**: Separate current and past trips
 - **Client registry**: Automatic deduplication
 
-### Iteration 3 (Completed) - **CURRENT VERSION**
+### Iteration 3 (Completed)
 - **Database persistence** (SQLite with full ACID transactions)
 - **Numeric trip IDs** (changed from alphanumeric to INTEGER)
 - **Smart layover validation**: Time-based policies
@@ -86,7 +88,20 @@
   - Deployment guide
 - **Comprehensive testing**: 18/18 tests passing
 
----
+### Final Iteration (Completed) - **CURRENT VERSION - LOCKED**
+- **OCL Constraints**: Formal specifications for all business rules
+  - Method preconditions/postconditions (book_trip)
+  - Class invariants (Reservation, Client, Trip)
+  - Runtime enforcement in production code
+- **UML State Machine**: Complete behavioral model for "Book a Trip"
+  - 9 states with explicit transitions
+  - Implemented as production code (State Pattern)
+  - Error handling and rollback paths
+- **Additional testing**: 19 final iteration tests (all passing)
+- **Repository locked**: Git tag v1.0-final created
+- **Total**: 44 tests, 4,370 lines of code, 7 docs, 6 UML diagrams
+
+--
 
 ## Quick Start
 
