@@ -6,6 +6,15 @@
 
 ---
 
+## 🎥 Video Demonstration
+
+**Watch the complete 5-minute system demonstration:**  
+[https://youtu.be/-fQv7yDQxxQ](https://youtu.be/-fQv7yDQxxQ)
+
+This video covers all four iterations, showing the complete software development lifecycle from requirements through deployment.
+
+---
+
 ## 📚 Documentation
 
 **For full details, see:**

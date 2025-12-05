@@ -4,6 +4,8 @@
 **Date:** November 23, 2025  
 **Status:** Repository Locked
 
+**Video Demonstration:** [https://youtu.be/-fQv7yDQxxQ](https://youtu.be/-fQv7yDQxxQ)
+
 ---
 
 ## Deliverables Summary

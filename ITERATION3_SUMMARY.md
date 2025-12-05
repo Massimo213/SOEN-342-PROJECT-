@@ -4,6 +4,8 @@
 **Status:** Production-ready  
 **Test Results:** 18/18 tests passing, 7 skipped (defensive), 0 failures
 
+**Video Demonstration:** [https://youtu.be/-fQv7yDQxxQ](https://youtu.be/-fQv7yDQxxQ)
+
 ---
 
 ## What Was Delivered
